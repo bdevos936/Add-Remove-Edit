@@ -20,7 +20,7 @@ http://localhost:5004
 
 ---
 
-# Communication Contract (DO NOT CHANGE)
+# Communication Contract
 
 All endpoints require the following header:
 
