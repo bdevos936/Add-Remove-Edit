@@ -5,20 +5,20 @@ app = Flask(__name__)
 
 records = {}
 
-def check_auth():
+def require_auth():
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
-        return False
-    return True
-
-
-@app.route("/records", methods=["POST"])
-def add_record():
-    if not check_auth():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
+    return None
 
-    data = request.json
 
+def get_record_or_error(record_id):
+    if record_id not in records:
+        return None, (jsonify({"success": False, "message": "Record not found"}), 404)
+    return records[record_id], None
+
+
+def build_record(data):
     record_id = str(uuid.uuid4())
     record = {
         "record_id": record_id,
@@ -28,7 +28,22 @@ def add_record():
         "value": data.get("value"),
         "timestamp": data.get("timestamp")
     }
+    return record_id, record
+def check_auth():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return False
+    return True
 
+
+@app.route("/records", methods=["POST"])
+def add_record():
+    auth_error = require_auth()
+    if auth_error:
+        return auth_error
+
+    data = request.json
+    record_id, record = build_record(data)
     records[record_id] = record
 
     return jsonify({
@@ -37,32 +52,35 @@ def add_record():
         "record": record
     }), 201
 
-
 @app.route("/records/<record_id>", methods=["PUT"])
 def edit_record(record_id):
-    if not check_auth():
-        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    auth_error = require_auth()
+    if auth_error:
+        return auth_error
 
-    if record_id not in records:
-        return jsonify({"success": False, "message": "Record not found"}), 404
+    record, lookup_error = get_record_or_error(record_id)
+    if lookup_error:
+        return lookup_error
 
     data = request.json
-    records[record_id].update(data)
+    record.update(data)
 
     return jsonify({
         "success": True,
         "message": "Record updated",
-        "record": records[record_id]
+        "record": record
     }), 200
 
 
 @app.route("/records/<record_id>", methods=["DELETE"])
 def delete_record(record_id):
-    if not check_auth():
-        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    auth_error = require_auth()
+    if auth_error:
+        return auth_error
 
-    if record_id not in records:
-        return jsonify({"success": False, "message": "Record not found"}), 404
+    record, lookup_error = get_record_or_error(record_id)
+    if lookup_error:
+        return lookup_error
 
     del records[record_id]
 
@@ -74,4 +92,5 @@ def delete_record(record_id):
 
 
 if __name__ == "__main__":
+
     app.run(port=5004, debug=True)
